@@ -2,7 +2,7 @@
 -------------   
 UPDATED GOLDFISH BILINGUAL TOKENIZER TRAINING 
 -------------   
-
+For model merging experiments, we can train bilingual tokenizers for non-BGPT pairs (i.e. all lang combinations that exclude English), which are currently not pretrained. 
 No temp merged files — stream directly to SentencePiece. Reduced shuffle overhead — rely on train_extremely_large_corpus=True for internal buffer shuffling. Increase threads — allow higher num_threads based on machine cores.
 Separate monolingual training — optional to merge vocabs later. Parallelization — carefully balance threads per process.
 """
