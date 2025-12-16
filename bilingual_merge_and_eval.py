@@ -129,6 +129,100 @@ def token_overlap(tok, tok_l1, tok_l2):
     return len(v & v1 & v2), len(v & v1 - v2), len(v & v2 - v1)
 
 # -------------------------------------------------
+# GOLD-FISH STYLE MERGE LOGIC
+# -------------------------------------------------
+def merge_models(args):
+    # load tokenizers and models
+    tok_l1 = AutoTokenizer.from_pretrained(args.model_l1)
+    tok_l2 = AutoTokenizer.from_pretrained(args.model_l2)
+    tok_new = AutoTokenizer.from_pretrained(args.bilingual_tokenizer)
+
+    model_l1 = AutoModelForCausalLM.from_pretrained(args.model_l1).to(DEVICE)
+    model_l2 = AutoModelForCausalLM.from_pretrained(args.model_l2).to(DEVICE)
+
+    d_model = model_l1.config.hidden_size
+    V_new = len(tok_new)
+
+    # Procrustes
+    shared = list(set(tok_l1.get_vocab()) & set(tok_l2.get_vocab()))
+    i1 = torch.tensor([tok_l1.get_vocab()[t] for t in shared], device=DEVICE)
+    i2 = torch.tensor([tok_l2.get_vocab()[t] for t in shared], device=DEVICE)
+
+    U, _, Vt = torch.linalg.svd(model_l1.get_input_embeddings().weight.data[i1].T @
+                                model_l2.get_input_embeddings().weight.data[i2])
+    R = U @ Vt
+
+    # Contextual embeddings
+    CONTEXT_TOPK = 2000
+    N_CONTEXTS = 4
+    BATCH_SIZE = 64
+
+    def contextual(model, tokenizer, tokens):
+        model.eval()
+        out = []
+        for i in tqdm(range(0, len(tokens), BATCH_SIZE)):
+            batch = tokens[i:i+BATCH_SIZE]
+            ctx = [f"This contains {t}." for t in batch for _ in range(N_CONTEXTS)]
+            enc = tokenizer(ctx, return_tensors="pt", padding=True).to(DEVICE)
+            with torch.no_grad():
+                h = model(**enc, output_hidden_states=True).hidden_states[1][:, -1, :]
+            for j in range(0, len(h), N_CONTEXTS):
+                out.append(h[j:j+N_CONTEXTS].mean(0))
+        return torch.stack(out)
+
+    freq_tokens = shared[:CONTEXT_TOPK]
+    ctx1 = contextual(model_l1, tok_l1, freq_tokens)
+    ctx2 = contextual(model_l2, tok_l2, freq_tokens) @ R.T
+    ctx = 0.5 * (ctx1 + ctx2)
+
+    # Build new embeddings
+    E_new = torch.zeros((V_new, d_model), device=DEVICE)
+
+    def static_embed(model, tok, t):
+        ids = tok.encode(t, add_special_tokens=False)
+        return model.get_input_embeddings().weight[ids].mean(0)
+
+    for i in tqdm(range(V_new)):
+        t = tok_new.convert_ids_to_tokens(i)
+        if t in freq_tokens:
+            E_new[i] = ctx[freq_tokens.index(t)]
+        else:
+            e1 = static_embed(model_l1, tok_l1, t)
+            e2 = R @ static_embed(model_l2, tok_l2, t)
+            E_new[i] = 0.5 * (e1 + e2)
+
+    # Merge transformer layers
+    def alpha(l, L):
+        return 0.7*(1-l/(L-1)) + 0.3*(l/(L-1))
+
+    out = AutoModelForCausalLM.from_pretrained(args.model_l1).to(DEVICE)
+    out.get_input_embeddings().weight.data = E_new.clone()
+    out.lm_head.weight.data = E_new.clone()
+
+    L = out.config.num_hidden_layers
+    for i in range(L):
+        a = alpha(i, L)
+        for k in out.transformer.h[i].state_dict():
+            out.transformer.h[i].state_dict()[k].copy_(
+                a * model_l1.transformer.h[i].state_dict()[k] +
+                (1-a) * model_l2.transformer.h[i].state_dict()[k]
+            )
+
+    # LoRA + freeze
+    lora = LoraConfig(r=args.lora_rank, lora_alpha=args.lora_alpha,
+                      target_modules=["c_attn","c_proj","mlp.c_fc","mlp.c_proj"])
+    model = get_peft_model(out, lora)
+
+    cut = int(L * args.freeze_ratio)
+    for nme, p in model.named_parameters():
+        if nme.startswith("transformer.h.") and int(nme.split(".")[2]) < cut:
+            p.requires_grad = False
+        else:
+            p.requires_grad = True
+
+    return model, tok_new, tok_l1, tok_l2
+
+# -------------------------------------------------
 # MAIN
 # -------------------------------------------------
 def main():
@@ -139,7 +233,8 @@ def main():
     # LOAD / MERGE MODEL
     # -------------------------------------------------
     if args.do_merge:
-        raise NotImplementedError("Merge path unchanged here for brevity")
+        print("Merging models...")
+        model, tok, tok_l1, tok_l2 = merge_models(args)
     else:
         model = AutoModelForCausalLM.from_pretrained(args.bgpt_model).to(DEVICE)
         tok = AutoTokenizer.from_pretrained(args.bgpt_model)
