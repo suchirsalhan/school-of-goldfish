@@ -98,16 +98,18 @@ def parse_args():
 # HF PUSH UTILITY
 # -------------------------------------------------
 def push_to_hf(local_folder, repo_suffix):
+    """
+    Push a folder to Hugging Face Hub. Uses cached login if HF_TOKEN not set.
+    """
     username = "suchirsalhan"
-    repo_name = repo_suffix
-    hf_repo_id = f"{username}/{repo_name}"
+    hf_repo_id = f"{username}/{repo_suffix}"
 
     api = HfApi()
     try:
         api.repo_info(hf_repo_id)
     except Exception:
         print(f"Repo {hf_repo_id} not found. Creating it...")
-        create_repo(repo_name, token=os.environ["HF_TOKEN"], repo_type="model", exist_ok=True)
+        create_repo(repo_suffix, repo_type="model", exist_ok=True)
 
     upload_folder(
         local_folder,
@@ -116,6 +118,7 @@ def push_to_hf(local_folder, repo_suffix):
         commit_message=f"Push {os.path.basename(local_folder)} checkpoint → main"
     )
     print(f"Pushed {local_folder} → HF repo {hf_repo_id}")
+
 
 # -------------------------------------------------
 # UTILITIES
@@ -245,7 +248,7 @@ def merge_models(args):
     tok_new.save_pretrained(full_ckpt_dir)
     print(f"Full merged weights saved to {full_ckpt_dir}")
 
-    # Push full merged to HF using explicit repo if provided
+     # Push full merged to HF if requested
     if args.push_hf:
         repo_suffix = args.hf_repo_merged or f"{args.l1}_{args.l2}_merge-merged"
         push_to_hf(full_ckpt_dir, repo_suffix)
@@ -296,7 +299,6 @@ def main():
         tok.save_pretrained(full_ckpt_dir)
         print(f"Full trained weights saved to {full_ckpt_dir}")
 
-        # Push full trained to HF using explicit repo if provided
         if args.push_hf:
             repo_suffix = args.hf_repo_trained or f"{args.l1}_{args.l2}_merge-trained"
             push_to_hf(full_ckpt_dir, repo_suffix)
