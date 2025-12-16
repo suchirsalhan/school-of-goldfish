@@ -10,6 +10,7 @@ Supports:
 - Optional training
 - Full bilingual diagnostics: PPL, fragmentation, entropy, token overlap
 - Outputs a CSV
+- Fully saved merged checkpoints with automatic HF push to main branch
 """
 
 import argparse
@@ -26,12 +27,14 @@ from transformers import (
     DataCollatorForLanguageModeling,
 )
 from peft import LoraConfig, get_peft_model
+import os
+from huggingface_hub import upload_folder
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 torch.set_float32_matmul_precision("high")
 
 # -------------------------------------------------
-# HARD-CODED OPUS LANGUAGE PAIRS (Patch A)
+# HARD-CODED OPUS LANGUAGE PAIRS
 # -------------------------------------------------
 ALLOWED_OPUS_PAIRS = {
     "en-nl": ("en", "nl"),
@@ -90,6 +93,7 @@ def parse_args():
     p.add_argument("--do_train", action="store_true")
     p.add_argument("--do_eval", action="store_true")
     p.add_argument("--output_dir", type=str, default="out")
+    p.add_argument("--push_hf", action="store_true", help="Push final checkpoint to HF hub")
 
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--lr", type=float, default=1e-4)
@@ -220,6 +224,18 @@ def merge_models(args):
         else:
             p.requires_grad = True
 
+    # Save full merged weights immediately
+    os.makedirs(args.output_dir, exist_ok=True)
+    full_ckpt_dir = os.path.join(args.output_dir, "full_merged")
+    model.save_pretrained(full_ckpt_dir)
+    tok_new.save_pretrained(full_ckpt_dir)
+    print(f"Full merged weights saved to {full_ckpt_dir}")
+
+    # Automatic push to HF main branch
+    if args.push_hf:
+        upload_folder(full_ckpt_dir, repo_id=args.output_dir.split("/")[-1], repo_type="model", commit_message="Full merged checkpoint → main")
+        print(f"Pushed merged model to HF main branch")
+
     return model, tok_new, tok_l1, tok_l2
 
 # -------------------------------------------------
@@ -242,7 +258,7 @@ def main():
         tok_l2 = AutoTokenizer.from_pretrained(args.model_l2 or args.bgpt_model)
 
     # -------------------------------------------------
-    # TRAINING  (Patch B + Patch D — bilingual, no silent replication)
+    # TRAINING
     # -------------------------------------------------
     if args.do_train:
         print("Loading training data...")
@@ -252,7 +268,6 @@ def main():
         print(f"Using {n}/{len(ds)} training examples")
         ds = ds.shuffle(seed=0).select(range(n))
 
-        # FIX: explicit bilingual expansion (no silent duplication)
         def flatten(x):
             return {
                 "text": [
@@ -282,8 +297,19 @@ def main():
         )
         trainer.train()
 
+        # Save full checkpoint after training
+        full_ckpt_dir = os.path.join(args.output_dir, "full_trained")
+        model.save_pretrained(full_ckpt_dir)
+        tok.save_pretrained(full_ckpt_dir)
+        print(f"Full trained weights saved to {full_ckpt_dir}")
+
+        # Automatic push to HF main branch
+        if args.push_hf:
+            upload_folder(full_ckpt_dir, repo_id=args.output_dir.split("/")[-1], repo_type="model", commit_message="Full trained checkpoint → main")
+            print(f"Pushed trained model to HF main branch")
+
     # -------------------------------------------------
-    # EVALUATION  (Patch C)
+    # EVALUATION
     # -------------------------------------------------
     if args.do_eval:
         print("Evaluating model...")
@@ -332,4 +358,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
