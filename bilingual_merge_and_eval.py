@@ -81,6 +81,8 @@ def parse_args():
     p.add_argument("--do_eval", action="store_true")
     p.add_argument("--output_dir", type=str, default="out")
     p.add_argument("--push_hf", action="store_true", default=True, help="Push final checkpoint to HF hub")
+    p.add_argument("--hf_repo_merged", type=str, help="HF repo ID for merged checkpoint")
+    p.add_argument("--hf_repo_trained", type=str, help="HF repo ID for trained checkpoint")
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--train_bs", type=int, default=16)
@@ -156,9 +158,10 @@ def merge_models(args):
     tok_new.save_pretrained(full_ckpt_dir)
     print(f"Full merged weights saved to {full_ckpt_dir}")
 
-    # Push full merged to HF
+    # Push full merged to HF using explicit repo if provided
     if args.push_hf:
-        push_to_hf(full_ckpt_dir, f"{os.path.basename(args.output_dir)}-merged")
+        repo_suffix = args.hf_repo_merged or f"{args.l1}_{args.l2}_merge-merged"
+        push_to_hf(full_ckpt_dir, repo_suffix)
 
     return model, tok_new, tok_l1, tok_l2
 
@@ -206,9 +209,10 @@ def main():
         tok.save_pretrained(full_ckpt_dir)
         print(f"Full trained weights saved to {full_ckpt_dir}")
 
-        # Push full trained to HF
+        # Push full trained to HF using explicit repo if provided
         if args.push_hf:
-            push_to_hf(full_ckpt_dir, f"{os.path.basename(args.output_dir)}-trained")
+            repo_suffix = args.hf_repo_trained or f"{args.l1}_{args.l2}_merge-trained"
+            push_to_hf(full_ckpt_dir, repo_suffix)
 
     if args.do_eval:
         print("Evaluating model...")
