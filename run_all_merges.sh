@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export CUDA_VISIBLE_DEVICES=1
+
 declare -A MODELS=(
   [es]="spa_latn_1000mb catherinearnett/B-GPT_en_es_simultaneous"
   [el]="ell_grek_1000mb catherinearnett/B-GPT_en_el_simultaneous"
