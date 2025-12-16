@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=2
 
 declare -A MODELS=(
   [es]="spa_latn_1000mb catherinearnett/B-GPT_en_es_simultaneous"
