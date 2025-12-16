@@ -38,6 +38,7 @@ for L2 in es el nl pl; do
     --lora_alpha 32 \
     --freeze_ratio 0.6 \
     --max_train_examples 50000 \
-    --max_eval_examples 2000
+    --max_eval_examples 2000 \
+    --push_hf   # <-- added this flag
 done
 
