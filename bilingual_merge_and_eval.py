@@ -108,7 +108,7 @@ def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, token=None):
     """
     # Determine HF repo name based on output_dir and suffix
     base_name = os.path.basename(output_dir)  # e.g., en_es_merge
-    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}"  # e.g., suchirsalhan/en_es_merge-merged
+    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}".strip("/")  # remove trailing slashes
 
     # Create the repo if it doesn't exist
     try:
@@ -117,9 +117,12 @@ def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, token=None):
     except Exception as e:
         print(f"Warning: could not create repo {hf_repo_id}: {e}")
 
+    # Debug info
+    print(f"Pushing folder {os.path.abspath(local_ckpt_dir)} → HF repo {hf_repo_id}")
+
     # Upload the folder
     upload_folder(
-        folder_path=local_ckpt_dir,
+        folder_path=os.path.abspath(local_ckpt_dir),
         repo_id=hf_repo_id,
         repo_type="model",
         commit_message=f"Full {repo_suffix} checkpoint → main",
