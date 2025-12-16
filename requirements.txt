@@ -1,4 +1,9 @@
-sentencepiece>=0.1.99
-datasets>=2.16.0
-huggingface_hub>=0.20.0
-transformers>=4.36.0
+torch>=2.1.0                        # PyTorch
+transformers>=4.36.0                # Hugging Face Transformers
+datasets>=2.16.0                     # Hugging Face Datasets
+huggingface_hub>=0.20.0             # For downloading models
+sentencepiece>=0.1.99                # Tokenizer support
+peft>=0.6.0                          # LoRA adapter support
+tqdm>=4.65.0                         # Progress bars
+numpy>=1.25.0                        # Used internally by HF / torch
+pandas>=2.0.0                        # Optional if you want to handle CSVs more easily
