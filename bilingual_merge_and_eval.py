@@ -93,8 +93,7 @@ def parse_args():
     p.add_argument("--do_train", action="store_true")
     p.add_argument("--do_eval", action="store_true")
     p.add_argument("--output_dir", type=str, default="out")
-    p.add_argument("--push_hf", action="store_true", help="Push final checkpoint to HF hub")
-
+    p.add_argument("--push_hf", action="store_true", default=True, help="Push final checkpoint to HF hub")
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--train_bs", type=int, default=16)
