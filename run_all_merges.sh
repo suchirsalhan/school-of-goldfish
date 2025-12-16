@@ -1,8 +1,6 @@
 #!/bin/bash
-
 export CUDA_VISIBLE_DEVICES=2
 
-# Map of L2 languages to model/tokenizer
 declare -A MODELS=(
   [es]="spa_latn_1000mb catherinearnett/B-GPT_en_es_simultaneous"
   [el]="ell_grek_1000mb catherinearnett/B-GPT_en_el_simultaneous"
@@ -10,12 +8,11 @@ declare -A MODELS=(
   [pl]="pol_latn_1000mb catherinearnett/B-GPT_en_pl_simultaneous"
 )
 
-HF_USER="suchirsalhan"  # your HF username
+HF_USER="suchirsalhan"
 
 for L2 in es el nl pl; do
   read L2_MODEL TOKENIZER <<< "${MODELS[$L2]}"
 
-  # Special-case Greek (OPUS direction issue)
   if [ "$L2" = "el" ]; then
     LANG_PAIR="el-en"
   else
@@ -26,10 +23,9 @@ for L2 in es el nl pl; do
   HF_REPO_MERGED="${HF_USER}/en_${L2}_merge-merged"
   HF_REPO_TRAINED="${HF_USER}/en_${L2}_merge-trained"
 
-  # Create HF repos programmatically if not existing
+  # Create HF repos
   python - <<END
 from huggingface_hub import create_repo
-
 for repo in ["$HF_REPO_MERGED", "$HF_REPO_TRAINED"]:
     try:
         create_repo(repo, exist_ok=True)
@@ -38,7 +34,7 @@ for repo in ["$HF_REPO_MERGED", "$HF_REPO_TRAINED"]:
         print(f"Repo exists or error: {repo} -> {e}")
 END
 
-  # Run the Python merge/train/eval script
+  # Run Python script with explicit HF repo IDs
   python bilingual_merge_and_eval.py \
     --l1 en --l2 $L2 \
     --model_l1 goldfish-models/eng_latn_1000mb \
@@ -59,6 +55,7 @@ END
     --freeze_ratio 0.6 \
     --max_train_examples 50000 \
     --max_eval_examples 2000 \
-    --push_hf
+    --push_hf \
+    --hf_repo_merged $HF_REPO_MERGED \
+    --hf_repo_trained $HF_REPO_TRAINED
 done
-
