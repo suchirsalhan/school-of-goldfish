@@ -19,11 +19,12 @@ freeze_ratios=(0.3 0.5 0.7)
 
 L2_LANGS=("es" "el" "nl" "pl")
 
-declare -A MODELS
-MODELS=( ["es"]="spa_latn_1000mb:catherinearnett/B-GPT_en_es_simultaneous"
-         ["el"]="ell_grek_1000mb:catherinearnett/B-GPT_en_el_simultaneous"
-         ["nl"]="nld_latn_1000mb:catherinearnett/B-GPT_en_nl_simultaneous"
-         ["pl"]="pol_latn_1000mb:catherinearnett/B-GPT_en_pl_simultaneous" )
+declare -A MODELS=(
+    ["es"]="spa_latn_1000mb:catherinearnett/B-GPT_en_es_simultaneous"
+    ["el"]="ell_grek_1000mb:catherinearnett/B-GPT_en_el_simultaneous"
+    ["nl"]="nld_latn_1000mb:catherinearnett/B-GPT_en_nl_simultaneous"
+    ["pl"]="pol_latn_1000mb:catherinearnett/B-GPT_en_pl_simultaneous"
+)
 
 MAX_EVAL=500
 CSV_FILE="merge_hp_search_results.csv"
@@ -76,24 +77,26 @@ for L2 in "${L2_LANGS[@]}"; do
             --lora_alpha "$alpha" \
             --freeze_ratio "$freeze" \
             --start_weight "$start_w" \
-            --end_weight "$end_w"
+            --end_weight "$end_w" \
+            --push_hf False
 
         # Append results to CSV if file exists
         run_csv="$out_dir/bilingual_diagnostics.csv"
         if [[ -f "$run_csv" ]]; then
-            # Add extra columns for tracking hyperparams and repo info
-            awk -v l2="$L2" -v sw="$start_w" -v ew="$end_w" -v r="$r" -v a="$alpha" -v fz="$freeze" -v dir="$out_dir" -v hf="$hf_name" 'BEGIN{FS=OFS=","} NR>1{$(NF+1)=l2; $(NF+1)=sw; $(NF+1)=ew; $(NF+1)=r; $(NF+1)=a; $(NF+1)=fz; $(NF+1)=dir; $(NF+1)=hf; print}' "$run_csv" >> "$CSV_FILE"
+            awk -v l2="$L2" -v sw="$start_w" -v ew="$end_w" -v r="$r" -v a="$alpha" -v fz="$freeze" -v dir="$out_dir" -v hf="$hf_name" \
+                'BEGIN{FS=OFS=","} NR>1{$(NF+1)=l2; $(NF+1)=sw; $(NF+1)=ew; $(NF+1)=r; $(NF+1)=a; $(NF+1)=fz; $(NF+1)=dir; $(NF+1)=hf; print}' \
+                "$run_csv" >> "$CSV_FILE"
         fi
 
         # Push checkpoint to Hugging Face
         echo "Pushing $hf_name → Hugging Face"
         huggingface-cli repo create "$hf_name" --type model --yes || true
-        git -C "$out_dir" init
+        git -C "$out_dir" init || true
         git -C "$out_dir" add .
         git -C "$out_dir" commit -m "Merged checkpoint $hf_name" || true
-        git -C "$out_dir" branch -M main
-        git -C "$out_dir" remote add origin "https://huggingface.co/USERNAME/$hf_name" || true
-        git -C "$out_dir" push -u origin main --force
+        git -C "$out_dir" branch -M main || true
+        git -C "$out_dir" remote add origin "https://huggingface.co/suchirsalhan/$hf_name" || true
+        git -C "$out_dir" push -u origin main --force || true
 
     done
     done
@@ -103,4 +106,5 @@ for L2 in "${L2_LANGS[@]}"; do
 done
 
 echo "Hyperparameter search done. Results saved → $CSV_FILE"
+
 
