@@ -233,12 +233,16 @@ def merge_models(args):
     tok_new.save_pretrained(full_ckpt_dir)
     print(f"Full merged weights saved to {full_ckpt_dir}")
 
-    # Automatic push to HF main branch
+    # Automatic push to HF using your username
     if args.push_hf:
-        upload_folder(full_ckpt_dir, repo_id=args.output_dir.split("/")[-1], repo_type="model", commit_message="Full merged checkpoint → main")
-        print(f"Pushed merged model to HF main branch")
-
-    return model, tok_new, tok_l1, tok_l2
+        hf_repo_id = f"suchirsalhan/{os.path.basename(args.output_dir)}"
+        upload_folder(
+            full_ckpt_dir,
+            repo_id=hf_repo_id,
+            repo_type="model",
+            commit_message="Full merged checkpoint → main"
+        )
+        print(f"Pushed merged model to HF: {hf_repo_id}")
 
 # -------------------------------------------------
 # MAIN
@@ -304,11 +308,16 @@ def main():
         model.save_pretrained(full_ckpt_dir)
         tok.save_pretrained(full_ckpt_dir)
         print(f"Full trained weights saved to {full_ckpt_dir}")
-
-        # Automatic push to HF main branch
+        # Automatic push to HF using your username
         if args.push_hf:
-            upload_folder(full_ckpt_dir, repo_id=args.output_dir.split("/")[-1], repo_type="model", commit_message="Full trained checkpoint → main")
-            print(f"Pushed trained model to HF main branch")
+            hf_repo_id = f"suchirsalhan/{os.path.basename(args.output_dir)}"
+            upload_folder(
+                full_ckpt_dir,
+                repo_id=hf_repo_id,
+                repo_type="model",
+                commit_message="Full merged checkpoint → main"
+            )
+            print(f"Pushed merged model to HF: {hf_repo_id}")
 
     # -------------------------------------------------
     # EVALUATION
