@@ -12,13 +12,20 @@ declare -A MODELS=(
 for L2 in es el nl pl; do
   read L2_MODEL TOKENIZER <<< "${MODELS[$L2]}"
 
+  # Special-case Greek (OPUS direction issue)
+  if [ "$L2" = "el" ]; then
+    LANG_PAIR="el-en"
+  else
+    LANG_PAIR="en-$L2"
+  fi
+
   python bilingual_merge_and_eval.py \
     --l1 en --l2 $L2 \
     --model_l1 goldfish-models/eng_latn_1000mb \
     --model_l2 goldfish-models/$L2_MODEL \
     --bilingual_tokenizer $TOKENIZER \
     --dataset opus_books \
-    --lang_pair en-$L2 \
+    --lang_pair $LANG_PAIR \
     --output_dir out/en_${L2}_merge \
     --do_merge \
     --do_train \
@@ -33,3 +40,4 @@ for L2 in es el nl pl; do
     --max_train_examples 50000 \
     --max_eval_examples 2000
 done
+
