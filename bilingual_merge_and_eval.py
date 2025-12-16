@@ -95,7 +95,9 @@ def parse_args():
     p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--train_bs", type=int, default=16)
     p.add_argument("--grad_accum", type=int, default=2)
-
+    p.add_argument("--lora_rank", type=int, default=16)
+    p.add_argument("--lora_alpha", type=int, default=32)
+    p.add_argument("--freeze_ratio", type=float, default=0.6)
     return p.parse_args()
 
 # -------------------------------------------------
