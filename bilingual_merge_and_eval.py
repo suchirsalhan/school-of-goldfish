@@ -97,27 +97,37 @@ def parse_args():
 # -------------------------------------------------
 # HF PUSH UTILITY
 # -------------------------------------------------
-def push_to_hf(local_folder, repo_suffix):
+def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, token=None):
     """
-    Push a folder to Hugging Face Hub. Uses cached login if HF_TOKEN not set.
+    Pushes a local checkpoint folder to a HF repo automatically.
+    
+    local_ckpt_dir : str : Path to local checkpoint (e.g., out/en_es_merge/full_merged)
+    output_dir     : str : Base output directory (e.g., out/en_es_merge)
+    repo_suffix    : str : 'merged' or 'trained'
+    token          : str : HF token (optional)
     """
-    username = "suchirsalhan"
-    hf_repo_id = f"{username}/{repo_suffix}"
+    # Determine HF repo name based on output_dir and suffix
+    base_name = os.path.basename(output_dir)  # e.g., en_es_merge
+    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}"  # e.g., suchirsalhan/en_es_merge-merged
 
-    api = HfApi()
+    # Create the repo if it doesn't exist
     try:
-        api.repo_info(hf_repo_id)
-    except Exception:
-        print(f"Repo {hf_repo_id} not found. Creating it...")
-        create_repo(repo_suffix, repo_type="model", exist_ok=True)
+        create_repo(hf_repo_id, token=token, exist_ok=True)
+        print(f"Repo ready: {hf_repo_id}")
+    except Exception as e:
+        print(f"Warning: could not create repo {hf_repo_id}: {e}")
 
+    # Upload the folder
     upload_folder(
-        local_folder,
+        folder_path=local_ckpt_dir,
         repo_id=hf_repo_id,
         repo_type="model",
-        commit_message=f"Push {os.path.basename(local_folder)} checkpoint → main"
+        commit_message=f"Full {repo_suffix} checkpoint → main",
+        token=token,
     )
-    print(f"Pushed {local_folder} → HF repo {hf_repo_id}")
+    print(f"Pushed {repo_suffix} model to HF: {hf_repo_id}")
+
+
 
 
 # -------------------------------------------------
@@ -241,17 +251,13 @@ def merge_models(args):
         else:
             p.requires_grad = True
 
-    # Save full merged weights immediately
-    os.makedirs(args.output_dir, exist_ok=True)
-    full_ckpt_dir = os.path.join(args.output_dir, "full_merged")
-    model.save_pretrained(full_ckpt_dir)
-    tok_new.save_pretrained(full_ckpt_dir)
-    print(f"Full merged weights saved to {full_ckpt_dir}")
-
-     # Push full merged to HF if requested
+    # Save full merged weights
+    full_merged_dir = os.path.join(args.output_dir, "full_merged")
+    model.save_pretrained(full_merged_dir)
+    tok_new.save_pretrained(full_merged_dir)
+    print(f"Full merged weights saved to {full_merged_dir}")
     if args.push_hf:
-        repo_suffix = args.hf_repo_merged or f"{args.l1}_{args.l2}_merge-merged"
-        push_to_hf(full_ckpt_dir, repo_suffix)
+        push_to_hf(full_merged_dir, args.output_dir, repo_suffix="merged", token=None)
 
     return model, tok_new, tok_l1, tok_l2
 
@@ -294,14 +300,12 @@ def main():
         trainer.train()
 
         # Save full trained checkpoint
-        full_ckpt_dir = os.path.join(args.output_dir, "full_trained")
-        model.save_pretrained(full_ckpt_dir)
-        tok.save_pretrained(full_ckpt_dir)
-        print(f"Full trained weights saved to {full_ckpt_dir}")
-
+        full_trained_dir = os.path.join(args.output_dir, "full_trained")
+        model.save_pretrained(full_trained_dir)
+        tok.save_pretrained(full_trained_dir)
+        print(f"Full trained weights saved to {full_trained_dir}")
         if args.push_hf:
-            repo_suffix = args.hf_repo_trained or f"{args.l1}_{args.l2}_merge-trained"
-            push_to_hf(full_ckpt_dir, repo_suffix)
+            push_to_hf(full_trained_dir, args.output_dir, repo_suffix="trained", token=None)
 
     if args.do_eval:
         print("Evaluating model...")
