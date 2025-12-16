@@ -102,6 +102,8 @@ def parse_args():
     p.add_argument("--lora_rank", type=int, default=16)
     p.add_argument("--lora_alpha", type=int, default=32)
     p.add_argument("--freeze_ratio", type=float, default=0.6)
+    p.add_argument("--start_weight", type=float, default=0.7, help="Start weight for L1 layers in alpha(l,L)")
+    p.add_argument("--end_weight", type=float, default=0.3, help="End weight for L1 layers in alpha(l,L)")
     return p.parse_args()
 
 # -------------------------------------------------
@@ -195,9 +197,10 @@ def merge_models(args):
             e2 = R @ static_embed(model_l2, tok_l2, t)
             E_new[i] = 0.5 * (e1 + e2)
 
-    # Merge transformer layers
-    def alpha(l, L):
-        return 0.7*(1-l/(L-1)) + 0.3*(l/(L-1))
+    # Merge transformer layers – we don't hardcode defaults for hyperparameter sweep
+    def alpha(l, L, start_weight, end_weight):
+        return start_weight * (1 - l/(L-1)) + end_weight * (l/(L-1))
+
 
     out = AutoModelForCausalLM.from_pretrained(args.model_l1).to(DEVICE)
     out.get_input_embeddings().weight.data = E_new.clone()
@@ -205,7 +208,7 @@ def merge_models(args):
 
     L = out.config.num_hidden_layers
     for i in range(L):
-        a = alpha(i, L)
+        a = alpha(i, L, args.start_weight, args.end_weight)
         for k in out.transformer.h[i].state_dict():
             out.transformer.h[i].state_dict()[k].copy_(
                 a * model_l1.transformer.h[i].state_dict()[k] +
