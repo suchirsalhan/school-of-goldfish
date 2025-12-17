@@ -109,18 +109,39 @@ def parse_args():
 # HF PUSH UTILITY
 # -------------------------------------------------
 def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, token=None):
-    base_name = os.path.basename(output_dir)
-    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}".strip("/")
+    """
+    Pushes a local checkpoint folder to a HF repo automatically.
+    
+    local_ckpt_dir : str : Path to local checkpoint (e.g., out/en_es_merge/full_merged)
+    output_dir     : str : Base output directory (e.g., out/en_es_merge)
+    repo_suffix    : str : 'merged' or 'trained'
+    token          : str : HF token (optional)
+    """
+    # Determine HF repo name based on output_dir and suffix
+    base_name = os.path.basename(output_dir)  # e.g., en_es_merge
+    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}".strip("/")  # remove trailing slashes
 
-    create_repo(hf_repo_id, token=token, exist_ok=True)
+    # Create the repo if it doesn't exist
+    try:
+        create_repo(hf_repo_id, token=token, exist_ok=True)
+        print(f"Repo ready: {hf_repo_id}")
+    except Exception as e:
+        print(f"Warning: could not create repo {hf_repo_id}: {e}")
 
+    # Debug info
+    print(f"Pushing folder {os.path.abspath(local_ckpt_dir)} → HF repo {hf_repo_id}")
+
+    # Upload the folder
     upload_folder(
         folder_path=os.path.abspath(local_ckpt_dir),
         repo_id=hf_repo_id,
         repo_type="model",
-        commit_message=f"Checkpoint: {repo_suffix}",
+        commit_message=f"Full {repo_suffix} checkpoint → main",
         token=token,
     )
+    print(f"Pushed {repo_suffix} model to HF: {hf_repo_id}")
+
+
 
 # -------------------------------------------------
 # UTILITIES
@@ -256,7 +277,35 @@ def main():
         tok = AutoTokenizer.from_pretrained(args.bgpt_model)
         tok_l1 = AutoTokenizer.from_pretrained(args.model_l1 or args.bgpt_model)
         tok_l2 = AutoTokenizer.from_pretrained(args.model_l2 or args.bgpt_model)
+    if args.do_train:
+        print("Loading training data...")
+        ds = load_opus_pair(args.dataset, args.lang_pair, split="train")
+        n = min(args.max_train_examples, len(ds))
+        ds = ds.shuffle(seed=0).select(range(n))
+        ds = ds.map(lambda x: {"text": [x["translation"][args.l1], x["translation"][args.l2]]}, remove_columns=ds.column_names)
+        ds = ds.map(lambda x: tok(x["text"], truncation=True, max_length=64), batched=True, remove_columns=["text"])
 
+        trainer = Trainer(
+            model=model,
+            args=TrainingArguments(
+                output_dir=args.output_dir,
+                learning_rate=args.lr,
+                num_train_epochs=args.epochs,
+                per_device_train_batch_size=args.train_bs,
+                gradient_accumulation_steps=args.grad_accum,
+            ),
+            train_dataset=ds,
+            data_collator=DataCollatorForLanguageModeling(tok, mlm=False),
+        )
+        trainer.train()
+
+        # Save full trained checkpoint
+        full_trained_dir = os.path.join(args.output_dir, "full_trained")
+        model.save_pretrained(full_trained_dir)
+        tok.save_pretrained(full_trained_dir)
+        print(f"Full trained weights saved to {full_trained_dir}")
+        if args.push_hf:
+            push_to_hf(full_trained_dir, args.output_dir, repo_suffix="trained", token=None)
     if args.do_eval:
         ds = load_opus_pair(args.dataset, args.lang_pair, split="train")
         ds = ds.select(range(min(args.max_eval_examples, len(ds))))
@@ -276,6 +325,6 @@ def main():
             w = csv.DictWriter(f, fieldnames=row.keys())
             w.writeheader()
             w.writerows(rows)
-
+        print("Saved → bilingual_diagnostics.csv")
 if __name__ == "__main__":
     main()
