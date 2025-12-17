@@ -108,18 +108,25 @@ def parse_args():
 # -------------------------------------------------
 # HF PUSH UTILITY
 # -------------------------------------------------
-def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, token=None):
+def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, merge_frac=None, token=None):
     """
     Pushes a local checkpoint folder to a HF repo automatically.
     
     local_ckpt_dir : str : Path to local checkpoint (e.g., out/en_es_merge/full_merged)
     output_dir     : str : Base output directory (e.g., out/en_es_merge)
     repo_suffix    : str : 'merged' or 'trained'
+    merge_frac     : float : Optional, fraction of top layers merged (0-1)
     token          : str : HF token (optional)
     """
-    # Determine HF repo name based on output_dir and suffix
+    # Determine base repo name
     base_name = os.path.basename(output_dir)  # e.g., en_es_merge
-    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}".strip("/")  # remove trailing slashes
+
+    # Add top-layer fraction to repo name if provided
+    if merge_frac is not None:
+        frac_pct = int(merge_frac * 100)
+        base_name += f"_top{frac_pct}"
+
+    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}".strip("/")  # e.g., en_es_merge_top25-merged
 
     # Create the repo if it doesn't exist
     try:
@@ -259,7 +266,7 @@ def merge_models(args):
     tok_new.save_pretrained(save_dir)
 
     if args.push_hf:
-        push_to_hf(save_dir, args.output_dir, suffix)
+        push_to_hf(save_dir, args.output_dir, suffix, merge_frac=args.merge_top_frac)
 
     return model, tok_new, tok_l1, tok_l2
 
@@ -305,7 +312,7 @@ def main():
         tok.save_pretrained(full_trained_dir)
         print(f"Full trained weights saved to {full_trained_dir}")
         if args.push_hf:
-            push_to_hf(full_trained_dir, args.output_dir, repo_suffix="trained", token=None)
+            push_to_hf(save_dir, args.output_dir, suffix, merge_frac=args.merge_top_frac)
     if args.do_eval:
         ds = load_opus_pair(args.dataset, args.lang_pair, split="train")
         ds = ds.select(range(min(args.max_eval_examples, len(ds))))
