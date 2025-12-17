@@ -77,9 +77,13 @@ def parse_args():
     p.add_argument("--tokenizer_aware_merge", action="store_true",  default=True, help="Use Tokenizer-Aware Embedding Merge")
     return p.parse_args()
 
-def push_to_hf(local_ckpt_dir, output_dir, token=None):
+def push_to_hf(local_ckpt_dir, output_dir, l1=None, l2=None, token=None):
+    # include l1 and l2 in the repo name
     base_name = os.path.basename(output_dir)
-    hf_repo_id = f"suchirsalhan/{base_name}-TOKENWISE_MERGE".strip("/")
+    if l1 and l2:
+        hf_repo_id = f"suchirsalhan/{l1}_{l2}-{base_name}-TOKENWISE_MERGE"
+    else:
+        hf_repo_id = f"suchirsalhan/{base_name}-TOKENWISE_MERGE"
     try:
         create_repo(hf_repo_id, token=token, exist_ok=True)
         print(f"Repo ready: {hf_repo_id}")
@@ -94,6 +98,7 @@ def push_to_hf(local_ckpt_dir, output_dir, token=None):
         token=token,
     )
     print(f"Pushed TOKENWISE_MERGE model to HF: {hf_repo_id}")
+
 
 def load_opus_pair(dataset, lang_pair, split):
     if lang_pair not in ALLOWED_OPUS_PAIRS:
@@ -175,7 +180,7 @@ def merge_models(args):
     tok_new.save_pretrained(full_merged_dir)
     print(f"Tokenwise merged weights saved to {full_merged_dir}")
     if args.push_hf:
-        push_to_hf(full_merged_dir, args.output_dir)
+        push_to_hf(full_merged_dir, args.output_dir, l1=args.l1, l2=args.l2)
     return model_merged, tok_new, tok_l1, tok_l2
 
 def main():
@@ -218,7 +223,7 @@ def main():
         tok.save_pretrained(full_trained_dir)
         print(f"Full trained weights saved to {full_trained_dir}")
         if args.push_hf:
-            push_to_hf(full_trained_dir, args.output_dir)
+            push_to_hf(full_merged_dir, args.output_dir, l1=args.l1, l2=args.l2)
 
     if args.do_eval:
         print("Evaluating model...")
