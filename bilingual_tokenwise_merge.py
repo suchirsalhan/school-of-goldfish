@@ -74,7 +74,7 @@ def parse_args():
     p.add_argument("--lora_alpha", type=int, default=32)
     p.add_argument("--freeze_ratio", type=float, default=0.6)
     p.add_argument("--alpha_l1", type=float, default=0.5, help="Tokenwise interpolation weight for L1 embeddings")
-    p.add_argument("--tokenizer_aware_merge", action="store_true", help="Use Tokenizer-Aware Embedding Merge")
+    p.add_argument("--tokenizer_aware_merge", action="store_true",  default=True, help="Use Tokenizer-Aware Embedding Merge")
     return p.parse_args()
 
 def push_to_hf(local_ckpt_dir, output_dir, token=None):
