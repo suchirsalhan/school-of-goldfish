@@ -262,7 +262,8 @@ def merge_models(args):
     tok_new.save_pretrained(save_dir)
 
     if args.push_hf:
-        push_to_hf(save_dir, args.output_dir, suffix, merge_frac=args.merge_top_frac)
+        push_to_hf(local_ckpt_dir=save_dir,l1=args.l1,l2=args.l2, repo_suffix=suffix, merge_frac=args.merge_top_frac)
+
 
     return model, tok_new, tok_l1, tok_l2
 
@@ -307,8 +308,16 @@ def main():
         model.save_pretrained(full_trained_dir)
         tok.save_pretrained(full_trained_dir)
         print(f"Full trained weights saved to {full_trained_dir}")
+        trained_suffix = "trained"
+        full_trained_dir = os.path.join(args.output_dir, trained_suffix)
         if args.push_hf:
-            push_to_hf(save_dir, args.output_dir, suffix, merge_frac=args.merge_top_frac)
+            push_to_hf(
+                local_ckpt_dir=full_trained_dir,
+                l1=args.l1,
+                l2=args.l2,
+                repo_suffix=trained_suffix,
+                merge_frac=args.merge_top_frac,
+            )
     if args.do_eval:
         ds = load_opus_pair(args.dataset, args.lang_pair, split="train")
         ds = ds.select(range(min(args.max_eval_examples, len(ds))))
