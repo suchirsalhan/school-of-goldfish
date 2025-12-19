@@ -1,20 +1,30 @@
 #!/bin/bash
 export CUDA_VISIBLE_DEVICES=2
 
-declare -A MODELS=(
-  [es]="spa_latn_1000mb catherinearnett/B-GPT_en_es_simultaneous"
-  [el]="ell_grek_1000mb catherinearnett/B-GPT_en_el_simultaneous"
-  [nl]="nld_latn_1000mb catherinearnett/B-GPT_en_nl_simultaneous"
-  [pl]="pol_latn_1000mb catherinearnett/B-GPT_en_pl_simultaneous"
+# Monolingual L2 models
+declare -A MONOS=(
+  [es]="goldfish-models/spa_latn_1000mb"
+  [el]="goldfish-models/ell_grek_1000mb"
+  [nl]="goldfish-models/nld_latn_1000mb"
+  [pl]="goldfish-models/pol_latn_1000mb"
+)
+
+# Pick a representative bilingual tokenizer (L2->en simultaneous) for each L2
+declare -A TOKENIZERS=(
+  [es]="catherinearnett/B-GPT_es_en_simultaneous"
+  [el]="catherinearnett/B-GPT_el_en_simultaneous"
+  [nl]="catherinearnett/B-GPT_nl_en_simultaneous"
+  [pl]="catherinearnett/B-GPT_pl_en_simultaneous"
 )
 
 HF_USER="suchirsalhan"
 
 # Sweep through alpha_l1 interpolation values
-ALPHAS=(0.1 0.25 0.33 0.5 0.66 0.75 0.9)
+ALPHAS=(0.1 0.25 0.33 0.5 0.66 0.75 0.9,1.0)
 
 for L2 in es el nl pl; do
-  read L2_MODEL TOKENIZER <<< "${MODELS[$L2]}"
+  L2_MODEL="${MONOS[$L2]}"
+  TOKENIZER="${TOKENIZERS[$L2]}"
 
   if [ "$L2" = "el" ]; then
     LANG_PAIR="el-en"
@@ -36,7 +46,7 @@ for L2 in es el nl pl; do
     python bilingual_tokenwise_merge.py \
       --l1 en --l2 $L2 \
       --model_l1 goldfish-models/eng_latn_1000mb \
-      --model_l2 goldfish-models/$L2_MODEL \
+      --model_l2 $L2_MODEL \
       --bilingual_tokenizer $TOKENIZER \
       --dataset opus_books \
       --lang_pair $LANG_PAIR \
@@ -58,3 +68,4 @@ for L2 in es el nl pl; do
       --push_hf
   done
 done
+
