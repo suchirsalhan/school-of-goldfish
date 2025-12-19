@@ -108,37 +108,34 @@ def parse_args():
 # -------------------------------------------------
 # HF PUSH UTILITY
 # -------------------------------------------------
-def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, merge_frac=None, token=None):
+def push_to_hf(local_ckpt_dir, l1, l2, repo_suffix, merge_frac=None, token=None):
     """
-    Pushes a local checkpoint folder to a HF repo automatically.
-    
-    local_ckpt_dir : str : Path to local checkpoint (e.g., out/en_es_merge/full_merged)
-    output_dir     : str : Base output directory (e.g., out/en_es_merge)
-    repo_suffix    : str : 'merged' or 'trained'
-    merge_frac     : float : Optional, fraction of top layers merged (0-1)
+    Push a local checkpoint to HF with L1_L2 and optional top-fraction in the name.
+
+    local_ckpt_dir : str : Path to local checkpoint (e.g., out/en_es_merge/merged-top25)
+    l1             : str : L1 language code
+    l2             : str : L2 language code
+    repo_suffix    : str : e.g., 'merged' or 'trained'
+    merge_frac     : float : Optional top-layer fraction (0-1)
     token          : str : HF token (optional)
     """
-    # Determine base repo name
-    base_name = os.path.basename(output_dir)  # e.g., en_es_merge
+    base_name = f"{l1}_{l2}_merge"
 
-    # Add top-layer fraction to repo name if provided
     if merge_frac is not None:
         frac_pct = int(merge_frac * 100)
         base_name += f"_top{frac_pct}"
 
-    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}".strip("/")  # e.g., en_es_merge_top25-merged
+    hf_repo_id = f"suchirsalhan/{base_name}-{repo_suffix}"
 
-    # Create the repo if it doesn't exist
+    # Create repo if it doesn't exist
     try:
         create_repo(hf_repo_id, token=token, exist_ok=True)
         print(f"Repo ready: {hf_repo_id}")
     except Exception as e:
         print(f"Warning: could not create repo {hf_repo_id}: {e}")
 
-    # Debug info
     print(f"Pushing folder {os.path.abspath(local_ckpt_dir)} → HF repo {hf_repo_id}")
 
-    # Upload the folder
     upload_folder(
         folder_path=os.path.abspath(local_ckpt_dir),
         repo_id=hf_repo_id,
@@ -147,7 +144,6 @@ def push_to_hf(local_ckpt_dir, output_dir, repo_suffix, merge_frac=None, token=N
         token=token,
     )
     print(f"Pushed {repo_suffix} model to HF: {hf_repo_id}")
-
 
 
 # -------------------------------------------------
