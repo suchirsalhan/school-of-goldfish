@@ -7,6 +7,27 @@
 # - Push each checkpoint to Hugging Face
 
 set -euo pipefail
+export CUDA_VISIBLE_DEVICES=2
+
+# ----------------------------
+# Monolingual L2 models
+# ----------------------------
+declare -A MONOS=(
+    [es]="goldfish-models/spa_latn_1000mb"
+    [el]="goldfish-models/ell_grek_1000mb"
+    [nl]="goldfish-models/nld_latn_1000mb"
+    [pl]="goldfish-models/pol_latn_1000mb"
+)
+
+# Pick a representative bilingual tokenizer (L2->en simultaneous)
+declare -A TOKENIZERS=(
+    [es]="catherinearnett/B-GPT_es_en_simultaneous"
+    [el]="catherinearnett/B-GPT_el_en_simultaneous"
+    [nl]="catherinearnett/B-GPT_nl_en_simultaneous"
+    [pl]="catherinearnett/B-GPT_pl_en_simultaneous"
+)
+
+HF_USER="suchirsalhan"
 
 # ----------------------------
 # Search space
@@ -18,13 +39,6 @@ lora_alphas=(16 32 64)
 freeze_ratios=(0.3 0.5 0.7)
 
 L2_LANGS=("es" "el" "nl" "pl")
-
-declare -A MODELS=(
-    ["es"]="spa_latn_1000mb:catherinearnett/B-GPT_en_es_simultaneous"
-    ["el"]="ell_grek_1000mb:catherinearnett/B-GPT_en_el_simultaneous"
-    ["nl"]="nld_latn_1000mb:catherinearnett/B-GPT_en_nl_simultaneous"
-    ["pl"]="pol_latn_1000mb:catherinearnett/B-GPT_en_pl_simultaneous"
-)
 
 MAX_EVAL=500
 CSV_FILE="merge_hp_search_results.csv"
@@ -43,7 +57,9 @@ echo "l2,start_weight,end_weight,lora_rank,lora_alpha,freeze_ratio,ppl,fragmenta
 # Iterate over languages and hyperparameters
 # ----------------------------
 for L2 in "${L2_LANGS[@]}"; do
-    IFS=":" read -r L2_MODEL TOKENIZER <<< "${MODELS[$L2]}"
+    L2_MODEL="${MONOS[$L2]}"
+    TOKENIZER="${TOKENIZERS[$L2]}"
+
     if [[ "$L2" == "el" ]]; then
         LANG_PAIR="el-en"
     else
@@ -65,7 +81,7 @@ for L2 in "${L2_LANGS[@]}"; do
         python bilingual_merge_and_eval.py \
             --l1 en --l2 "$L2" \
             --model_l1 goldfish-models/eng_latn_1000mb \
-            --model_l2 "goldfish-models/$L2_MODEL" \
+            --model_l2 "$L2_MODEL" \
             --bilingual_tokenizer "$TOKENIZER" \
             --dataset opus_books \
             --lang_pair "$LANG_PAIR" \
@@ -106,5 +122,6 @@ for L2 in "${L2_LANGS[@]}"; do
 done
 
 echo "Hyperparameter search done. Results saved → $CSV_FILE"
+
 
 
