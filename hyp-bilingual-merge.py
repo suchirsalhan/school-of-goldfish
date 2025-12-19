@@ -304,12 +304,11 @@ def main():
         trainer.train()
 
         # Save full trained checkpoint
-        full_trained_dir = os.path.join(args.output_dir, "full_trained")
+        trained_suffix = "trained"
+        full_trained_dir = os.path.join(args.output_dir, trained_suffix)
         model.save_pretrained(full_trained_dir)
         tok.save_pretrained(full_trained_dir)
         print(f"Full trained weights saved to {full_trained_dir}")
-        trained_suffix = "trained"
-        full_trained_dir = os.path.join(args.output_dir, trained_suffix)
         if args.push_hf:
             push_to_hf(
                 local_ckpt_dir=full_trained_dir,
